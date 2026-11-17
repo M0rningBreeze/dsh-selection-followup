@@ -183,6 +183,9 @@ window.__ModuleLoader__.load({
       stop: '停止',
       thinking: '正在思考…',
       privateNote: '只在这里显示，不写入主对话',
+      copy: '复制',
+      copied: '已复制',
+      quote: '引用',
       contextLabel: '上下文',
       'context.selection': '仅选中',
       'context.recent': '近 5 轮',
@@ -233,6 +236,9 @@ window.__ModuleLoader__.load({
       stop: 'Stop',
       thinking: 'Thinking…',
       privateNote: 'Shown here only; the main conversation is not written to',
+      copy: 'Copy',
+      copied: 'Copied',
+      quote: 'Quote',
       contextLabel: 'Context',
       'context.selection': 'Selection',
       'context.recent': 'Last 5',
@@ -368,6 +374,7 @@ window.__ModuleLoader__.load({
     const CARD_CSS = `
 .sf-close:hover, .sf-chip:hover { background: ${COLORS.hover}; }
 .sf-quote-toggle:hover { background: ${COLORS.hover}; }
+.sf-sel:hover { background: ${COLORS.hover}; }
 .sf-stop { background: ${COLORS.blue}; color: #ffffff; }
 .sf-stop:hover { background: ${COLORS.blueHover}; }
 .sf-send { background: ${COLORS.blue}; color: #ffffff; }
@@ -472,6 +479,20 @@ window.__ModuleLoader__.load({
         color: COLORS.blue, borderRadius: '12px', height: '26px',
         padding: '0 10px', fontSize: '12px', lineHeight: '18px', fontWeight: 500,
         cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+      },
+      // Floating bar next to a fresh selection (replaces the built-in quote action).
+      selBar: {
+        display: 'flex', alignItems: 'center', gap: '2px', padding: '3px',
+        background: 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay))',
+        border: '1px solid var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12))',
+        borderRadius: '12px',
+        boxShadow: 'var(--dsw-shadow-lv3, 0 0 1px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.18))',
+      },
+      selButton: {
+        border: 0, background: 'transparent', color: COLORS.text, font: 'inherit',
+        fontSize: '13px', lineHeight: '20px', padding: '0 10px', height: '28px',
+        borderRadius: '9px', cursor: 'pointer', display: 'inline-flex',
+        alignItems: 'center', justifyContent: 'center', whiteSpace: 'nowrap',
       },
       composer: {
         border: 0, borderRadius: '20px', background: 'transparent',
@@ -931,6 +952,49 @@ window.__ModuleLoader__.load({
               }, h('path', { d: SEND_ICON, fill: 'currentColor' }))))))
     }
 
+    // --- selection bar ----------------------------------------------------
+
+    /**
+     * The bar shown right after a selection: copy the excerpt, or quote it into
+     * the composer. Replaces the built-in quote-only action so copy sits beside it.
+     * @param props - area-local text interaction and composer seats.
+     * @returns the action bar, or nothing in a read-only conversation.
+     */
+    function SelectionBar(props) {
+      const { readText, dismiss, clearSelection, inputActions } = props
+      const t = typeof props.t === 'function' ? props.t : key => key
+      const enabled = typeof props.useSession === 'function'
+        ? props.useSession(session => !session.removed
+          && (session.subagent === null || session.subagent.address.mode === 'continuable'))
+        : true
+      useEffect(() => { if (!enabled) dismiss() }, [enabled, dismiss])
+      if (!enabled) return null
+
+      const copy = () => {
+        const text = readText()
+        if (text === null) { dismiss(); return }
+        if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) {
+          navigator.clipboard.writeText(text).catch(() => {})
+        }
+        clearSelection()
+        dismiss()
+      }
+      const quote = () => {
+        const text = readText()
+        if (text === null) { dismiss(); return }
+        if (inputActions === undefined || !inputActions.insertQuote(text)) { dismiss(); return }
+        clearSelection()
+        dismiss()
+      }
+      return h('div', { style: styles.selBar, role: 'group', 'aria-label': t('title') },
+        h('button', {
+          key: 'copy', type: 'button', className: 'sf-sel', style: styles.selButton, onClick: copy,
+        }, t('copy')),
+        h('button', {
+          key: 'quote', type: 'button', className: 'sf-sel', style: styles.selButton, onClick: quote,
+        }, t('quote')))
+    }
+
     // --- plugin -----------------------------------------------------------
 
     return {
@@ -945,6 +1009,9 @@ window.__ModuleLoader__.load({
         ctx.effect(() => ctx.slots.inject('shell.overlay', () => ctx.slots.register({
           name: 'shell.overlay', id: OVERLAY, locale: NS,
         }, FollowUpCard)), 'selection-followup: card')
+        ctx.effect(() => ctx.slots.inject('conversation.chat.text-interaction', () => ctx.slots.register({
+          name: 'conversation.chat.text-interaction', key: 'quote', locale: NS,
+        }, SelectionBar)), 'selection-followup: selection bar')
         ctx.effect(() => ctx.uiConversation.interactions.register({
           id: INTERACTION,
           onInteraction(request) {
