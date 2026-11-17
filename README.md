@@ -34,16 +34,15 @@
 
 插件是纯本地目录，没有构建步骤、没有第三方依赖。
 
-**方式一 · 界面安装**：DSH → 设置 → 插件 → 添加本地插件 → 选择本目录。
+**方式一 · 界面安装**：DSH「插件」页 → **添加插件** → 粘贴本目录的绝对路径（输入框同时支持包名、GitHub 地址和本地目录路径）→ 安装。
 
-**方式二 · 让 Agent 装**：
+**方式二 · 命令行**：
 
-```text
-plugin_manager install_bundle
-  target: /path/to/selection-followup
+```bash
+dsh plugin add /path/to/selection-followup
 ```
 
-装好后插件列表显示「划词追问」。
+装好后插件列表显示「划词追问」。也可以让 Agent 用 `plugin_manager` 的 `install_bundle` 指向同一目录。
 
 ## 结构
 
