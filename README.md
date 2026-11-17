@@ -73,9 +73,13 @@ ELECTRON_RUN_AS_NODE=1 node test-client.mjs   # 注册、定位、Markdown、折
 
 ## 展示页
 
-`site/index.html` 是一个自包含的落地页（无外部字体与 CDN），可直接用浏览器打开，也可以放到 GitHub Pages：
+`site/index.html` 是一个自包含的落地页（无外部字体与 CDN），可直接用浏览器打开，也可以发布到 GitHub Pages：把 `site/` 的内容作为站点根，或在仓库设置里选 `main` 分支的 `/docs` 目录（把 `site/index.html` 复制过去即可）。
 
-> Settings → Pages → Source: `main` / `docs`，或把 `site/` 作为站点根目录。
+## 发布到 DSH 插件市场
+
+市场（dshmarket）的条目来自精选列表 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin)：向那个仓库提一个 PR，在列表里加一条本插件的条目，站点与市场会自动收录（通常一天内生效）。本仓库不是插件目录，不要往市场仓库本身提条目。
+
+可选的加分项：把包发布到 npm（保留 `dsh-plugin` 关键字），市场会优先用 npm 包安装，并可检测版本更新。
 
 ## License
 
