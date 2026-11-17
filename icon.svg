@@ -1,8 +1,42 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Selection follow-up">
-  <rect x="4" y="4" width="56" height="56" rx="14" fill="#247bbf"/>
-  <rect x="14" y="16" width="26" height="3" rx="1.5" fill="#ffffff" opacity="0.92"/>
-  <rect x="14" y="24" width="36" height="3" rx="1.5" fill="#ffffff" opacity="0.92"/>
-  <rect x="14" y="32" width="20" height="3" rx="1.5" fill="#ffffff" opacity="0.92"/>
-  <path d="M14 44h16a6 6 0 0 0 6-6v-2" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round"/>
-  <path d="M33 30l4 6 7-9" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">选中追问</title>
+  <desc id="desc">选中文本后，在旁边打开一张独立的追问与答案卡片。</desc>
+  <defs>
+    <linearGradient id="background" x1="10" y1="6" x2="54" y2="60" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F8CFF"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <filter id="card-shadow" x="19" y="23" width="44" height="39" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#123B8F" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- 插件图标底色 -->
+  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#background)"/>
+  <path d="M18 3.5H46C53.5 3.5 59.5 9.5 59.5 17" stroke="white" stroke-opacity="0.16" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- 主对话：保持克制，表示回答不会写回这里 -->
+  <rect x="9" y="11" width="31" height="37" rx="7" fill="white" fill-opacity="0.13" stroke="white" stroke-opacity="0.24"/>
+  <rect x="15" y="18" width="19" height="3" rx="1.5" fill="white" fill-opacity="0.92"/>
+  <rect x="15" y="24" width="14" height="3" rx="1.5" fill="white" fill-opacity="0.48"/>
+  <rect x="15" y="43" width="11" height="3" rx="1.5" fill="white" fill-opacity="0.42"/>
+
+  <!-- 当前选中的一段文本 -->
+  <rect x="12" y="29" width="25" height="11" rx="3" fill="#DBEAFE"/>
+  <rect x="16" y="33" width="16" height="3" rx="1.5" fill="#2563EB"/>
+
+  <!-- 独立的追问卡片，用短指示角关联选区 -->
+  <g filter="url(#card-shadow)">
+    <path d="M36 27H50C53.866 27 57 30.134 57 34V47C57 50.866 53.866 54 50 54H36C32.134 54 29 50.866 29 47V40.4L25 37.5L29 34.6V34C29 30.134 32.134 27 36 27Z" fill="white"/>
+  </g>
+
+  <!-- 追问 -->
+  <path d="M36.6 34.3C36.8 32.5 38.2 31.4 40.1 31.4C42.2 31.4 43.7 32.6 43.7 34.4C43.7 35.9 42.9 36.7 41.7 37.4C40.8 38 40.3 38.5 40.3 39.6" stroke="#2563EB" stroke-width="2.2" stroke-linecap="round"/>
+  <circle cx="40.3" cy="42.4" r="1.2" fill="#2563EB"/>
+
+  <!-- 答案只留在卡片内 -->
+  <rect x="35" y="46" width="12" height="2.4" rx="1.2" fill="#93C5FD"/>
+  <rect x="35" y="50" width="8" height="2.4" rx="1.2" fill="#BFDBFE"/>
+  <circle cx="50" cy="48" r="5" fill="#22C55E" stroke="white" stroke-width="1.5"/>
+  <path d="M47.8 48L49.2 49.4L52.3 46.4" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
