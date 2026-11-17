@@ -115,44 +115,12 @@ if (card === undefined) throw new Error('overlay card was not registered')
 if (card.options.locale !== 'selectionFollowup') throw new Error('card is not locale-bound')
 if (impl.inject.includes('sidebarRight')) throw new Error('card must not depend on the sidebar')
 
-// The built-in quote seat is taken over so copy can sit beside quote.
-const bar = registrations.get('slot:conversation.chat.text-interaction:quote')
-if (bar === undefined) throw new Error('selection bar was not registered on the quote seat')
-
+// Copy lives in the card header: the shipped quote seat cannot be taken over.
 let copiedText = null
-let dismissed = 0
-let cleared = 0
-let quoted = null
 Object.defineProperty(globalThis, 'navigator', {
   configurable: true,
   value: { clipboard: { writeText: async (text) => { copiedText = text } } },
 })
-const barTree = bar.component({
-  t: key => key,
-  readText: () => 'hello',
-  dismiss: () => { dismissed += 1 },
-  clearSelection: () => { cleared += 1 },
-  inputActions: { insertQuote: (text) => { quoted = text; return true } },
-  useSession: selector => selector({ removed: false, subagent: null }),
-})
-const barButtons = []
-const collectBar = (node) => {
-  if (node === null || node === undefined || typeof node !== 'object') return
-  if (Array.isArray(node)) { node.forEach(collectBar); return }
-  if (node.type === 'button') barButtons.push(node)
-  collectBar(node.props?.children)
-}
-collectBar(barTree)
-if (barButtons.length !== 2) throw new Error(`expected copy and quote, got ${barButtons.length}`)
-const copyButton = barButtons.find(button => texts(button).join('') === 'copy')
-const quoteButton = barButtons.find(button => texts(button).join('') === 'quote')
-if (copyButton === undefined || quoteButton === undefined) throw new Error('bar actions are mislabelled')
-copyButton.props.onClick()
-await new Promise(resolve => setTimeout(resolve, 10))
-if (copiedText !== 'hello') throw new Error('copy did not write the selection')
-if (dismissed !== 1 || cleared !== 1) throw new Error('copy did not dismiss and clear')
-quoteButton.props.onClick()
-if (quoted !== 'hello') throw new Error('quote did not insert the selection')
 
 /** Collect every string child of a rendered tree. */
 function texts(node) {
@@ -464,6 +432,23 @@ if (modeChips.length === 0) throw new Error('no chip to click after switching mo
 modeChips[0].props.onClick()
 await new Promise(resolve => setTimeout(resolve, 20))
 if (bodies.at(-1).contextLimit !== 10) throw new Error(`recent mode limit wrong: ${bodies.at(-1).contextLimit}`)
+
+// The card header copies the excerpt.
+select('copy me please')
+const copyTree = renderTree()
+const copyButtons = []
+const walkCopy = (node) => {
+  if (node === null || node === undefined || typeof node !== 'object') return
+  if (Array.isArray(node)) { node.forEach(walkCopy); return }
+  if (node.type === 'button') copyButtons.push(node)
+  walkCopy(node.props?.children)
+}
+walkCopy(copyTree)
+const headerCopy = copyButtons.find(button => texts(button).join('') === 'copy')
+if (headerCopy === undefined) throw new Error('header copy button missing')
+headerCopy.props.onClick()
+await new Promise(resolve => setTimeout(resolve, 10))
+if (copiedText !== 'copy me please') throw new Error(`header copy wrote wrong text: ${copiedText}`)
 
 console.log('client test: ok', { effects: effects.length })
 
