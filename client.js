@@ -957,21 +957,20 @@ window.__ModuleLoader__.load({
     /**
      * The bar shown right after a selection: copy the excerpt, or quote it into
      * the composer. Replaces the built-in quote-only action so copy sits beside it.
+     *
+     * Deliberately hook-free: the chat only admits this surface for a writable
+     * session, and a hooks-order mistake here blanks the whole seat silently.
      * @param props - area-local text interaction and composer seats.
-     * @returns the action bar, or nothing in a read-only conversation.
+     * @returns the action bar.
      */
     function SelectionBar(props) {
-      const { readText, dismiss, clearSelection, inputActions } = props
       const t = typeof props.t === 'function' ? props.t : key => key
-      const enabled = typeof props.useSession === 'function'
-        ? props.useSession(session => !session.removed
-          && (session.subagent === null || session.subagent.address.mode === 'continuable'))
-        : true
-      useEffect(() => { if (!enabled) dismiss() }, [enabled, dismiss])
-      if (!enabled) return null
+      const read = typeof props.readText === 'function' ? props.readText : () => null
+      const dismiss = typeof props.dismiss === 'function' ? props.dismiss : () => {}
+      const clearSelection = typeof props.clearSelection === 'function' ? props.clearSelection : () => {}
 
       const copy = () => {
-        const text = readText()
+        const text = read()
         if (text === null) { dismiss(); return }
         if (typeof navigator !== 'undefined' && navigator.clipboard !== undefined) {
           navigator.clipboard.writeText(text).catch(() => {})
@@ -980,9 +979,11 @@ window.__ModuleLoader__.load({
         dismiss()
       }
       const quote = () => {
-        const text = readText()
+        const text = read()
         if (text === null) { dismiss(); return }
-        if (inputActions === undefined || !inputActions.insertQuote(text)) { dismiss(); return }
+        const actions = props.inputActions
+        if (actions === undefined || typeof actions.insertQuote !== 'function'
+          || !actions.insertQuote(text)) { dismiss(); return }
         clearSelection()
         dismiss()
       }
