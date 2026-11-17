@@ -2,7 +2,7 @@
 
 选中对话里的一段，右键在它旁边追问；答案只留在浮层卡片里，不写进主对话。
 
-![预览](docs/hero-shot.png)
+<img src="docs/hero-shot.png" width="820" alt="划词追问：选中一段，右侧浮出追问卡片">
 
 ## 特点
 
