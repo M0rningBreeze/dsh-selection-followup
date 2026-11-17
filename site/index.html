@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>划词追问 · 在对话旁边问，不打断主对话</title>
+<meta name="description" content="DeepSeek Harness 的划词追问插件：选中一段，右键追问，右侧浮出小卡片回答，不写进会话记录。">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1115;
+    --bg-soft: #15171c;
+    --surface: #1b1d23;
+    --surface-2: #2c2c2e;
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.14);
+    --text: #f2f4f8;
+    --muted: #a7adba;
+    --faint: #7c828e;
+    --blue: #5686fe;
+    --blue-soft: rgba(86, 134, 254, 0.14);
+    --radius: 24px;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background:
+      radial-gradient(900px 480px at 78% -10%, rgba(86, 134, 254, 0.16), transparent 70%),
+      radial-gradient(700px 420px at 8% 4%, rgba(86, 134, 254, 0.08), transparent 65%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .wrap { width: min(1120px, calc(100% - 48px)); margin: 0 auto; }
+
+  /* nav */
+  .nav { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: 0.2px; }
+  .brand-mark {
+    width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+    background: linear-gradient(150deg, var(--blue), #3556d8); color: #fff; font-size: 15px; font-weight: 700;
+  }
+  .nav-links { display: flex; align-items: center; gap: 22px; color: var(--muted); font-size: 14px; }
+  .nav-links a:hover { color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px;
+    border-radius: 999px; font-size: 14px; font-weight: 500; border: 1px solid transparent;
+    transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+  }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-primary:hover { background: #3f6ff5; transform: translateY(-1px); }
+  .btn-ghost { border-color: var(--line-strong); color: var(--text); }
+  .btn-ghost:hover { background: rgba(255, 255, 255, 0.06); }
+
+  /* hero */
+  .hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 540px); gap: 56px; align-items: center; padding: 56px 0 88px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 12px;
+    border: 1px solid var(--line-strong); border-radius: 999px; color: var(--muted); font-size: 13px;
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #4ed17e; }
+  h1 { font-size: clamp(32px, 4vw, 46px); line-height: 1.18; margin: 22px 0 18px; letter-spacing: -0.6px; }
+  h1 em { font-style: normal; color: var(--blue); }
+  .lede { color: var(--muted); font-size: 17px; max-width: 34em; margin: 0 0 28px; }
+  .actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .facts { display: flex; gap: 26px; margin-top: 34px; color: var(--faint); font-size: 13px; flex-wrap: wrap; }
+  .facts b { color: var(--text); font-weight: 600; }
+
+  /* mock window */
+  .window {
+    border: 1px solid var(--line); border-radius: 20px; background: linear-gradient(180deg, #171a20, #121419);
+    box-shadow: 0 40px 80px rgba(0, 0, 0, 0.45); overflow: hidden; position: relative;
+  }
+  .window-bar { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .window-bar i { width: 9px; height: 9px; border-radius: 50%; background: #3a3f49; }
+  .window-bar span { margin-left: 8px; color: var(--faint); font-size: 12px; }
+  .window-body { position: relative; padding: 22px 20px 26px; min-height: 420px; }
+  .line { height: 10px; border-radius: 6px; background: #23262d; margin-bottom: 12px; }
+  .line.w60 { width: 60%; } .line.w80 { width: 80%; } .line.w40 { width: 40%; } .line.w70 { width: 70%; }
+  .msg-user { margin: 18px 0 14px auto; width: 52%; background: var(--blue-soft); border-radius: 12px; padding: 10px 14px; color: #cdd6ea; font-size: 13px; }
+  .selection {
+    position: relative; background: rgba(86, 134, 254, 0.18); border-radius: 4px; padding: 0 2px; color: #dbe4f8;
+  }
+
+  /* the card */
+  .card {
+    position: absolute; right: -18px; bottom: 18px; width: 372px;
+    background: var(--surface-2); border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: var(--radius); padding: 14px; color: var(--text);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5); font-size: 14px;
+  }
+  .card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .card-title { font-size: 13px; color: var(--muted); font-weight: 500; }
+  .card-close { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); background: rgba(255, 255, 255, 0.04); }
+  .quote {
+    background: rgba(255, 255, 255, 0.08); border-radius: 16px; padding: 10px 12px; margin-bottom: 12px;
+    font-size: 12px; line-height: 1.6; color: #d5dae4;
+  }
+  .quote small { display: block; color: var(--faint); font-size: 11px; margin-bottom: 4px; }
+  .answer { font-size: 13.5px; line-height: 1.75; color: #e6eaf2; min-height: 96px; }
+  .answer b { color: #fff; }
+  .answer code { font-family: var(--mono); font-size: 12px; background: rgba(255, 255, 255, 0.09); padding: 1px 5px; border-radius: 5px; }
+  .answer ul { margin: 8px 0; padding-left: 18px; color: #d5dae4; }
+  .answer li { margin-bottom: 4px; }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .chip {
+    height: 32px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line-strong); border-radius: 18px; font-size: 13px; color: #e6eaf2;
+  }
+  .chip i { font-style: normal; color: var(--faint); }
+  .modes { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; color: var(--faint); }
+  .mode { height: 24px; padding: 0 10px; display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; }
+  .mode.on { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+  .composer { border-radius: 18px; padding: 6px 6px 6px 2px; display: flex; align-items: flex-end; gap: 8px; }
+  .composer-placeholder { flex: 1; color: var(--faint); font-size: 14px; padding: 8px 4px; }
+  .send {
+    width: 34px; height: 34px; border-radius: 50%; background: var(--blue); display: grid; place-items: center; flex: 0 0 auto;
+  }
+  .send svg { width: 16px; height: 16px; }
+  .note { font-size: 11.5px; color: var(--faint); margin-top: 4px; }
+
+  /* sections */
+  section { padding: 72px 0; }
+  .eyebrow { color: var(--blue); font-size: 13px; letter-spacing: 1.4px; text-transform: uppercase; margin: 0 0 12px; }
+  h2 { font-size: clamp(24px, 2.6vw, 32px); margin: 0 0 14px; letter-spacing: -0.3px; }
+  .section-lede { color: var(--muted); margin: 0 0 40px; max-width: 46em; }
+  .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .feature {
+    border: 1px solid var(--line); border-radius: 18px; padding: 22px; background: rgba(255, 255, 255, 0.02);
+    transition: border-color 0.2s ease, transform 0.2s ease;
+  }
+  .feature:hover { border-color: var(--line-strong); transform: translateY(-2px); }
+  .feature .icon { width: 34px; height: 34px; border-radius: 10px; background: var(--blue-soft); display: grid; place-items: center; margin-bottom: 14px; }
+  .feature h3 { font-size: 16px; margin: 0 0 8px; }
+  .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .step { border: 1px solid var(--line); border-radius: 18px; padding: 22px; background: rgba(255, 255, 255, 0.02); }
+  .step .num { font-family: var(--mono); color: var(--blue); font-size: 13px; margin-bottom: 10px; }
+  .step h3 { margin: 0 0 8px; font-size: 15px; }
+  .step p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+  .install-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .panel { border: 1px solid var(--line); border-radius: 18px; padding: 24px; background: rgba(255, 255, 255, 0.02); }
+  .panel h3 { margin: 0 0 10px; font-size: 15px; }
+  .panel p { margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+  pre {
+    margin: 0; padding: 14px 16px; border-radius: 12px; background: #111318; border: 1px solid var(--line);
+    font-family: var(--mono); font-size: 12.5px; color: #c9d2e3; overflow-x: auto; line-height: 1.7;
+  }
+  .muted { color: var(--muted); }
+  .limits { margin-top: 26px; border: 1px dashed var(--line-strong); border-radius: 16px; padding: 20px 22px; }
+  .limits h3 { margin: 0 0 10px; font-size: 14px; color: var(--muted); font-weight: 500; }
+  .limits ul { margin: 0; padding-left: 18px; color: var(--faint); font-size: 13.5px; }
+  .limits li { margin-bottom: 6px; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 56px; color: var(--faint); font-size: 13px; display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 960px) {
+    .hero { grid-template-columns: 1fr; gap: 40px; padding-top: 32px; }
+    .grid, .steps, .install-grid { grid-template-columns: 1fr; }
+    .card { position: relative; right: auto; bottom: auto; width: 100%; margin-top: 18px; }
+    .window-body { min-height: 0; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="nav">
+      <div class="brand"><span class="brand-mark">追</span> 划词追问</div>
+      <nav class="nav-links">
+        <a href="#features">特点</a>
+        <a href="#how">怎么用</a>
+        <a href="#install">安装</a>
+        <a class="btn btn-ghost" href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="badge"><span class="dot"></span> DeepSeek Harness 插件 · v1.0</span>
+          <h1>在对话<em>旁边</em>问，<br>不打断主对话</h1>
+          <p class="lede">
+            读到一段想深究的内容，选中它、右键「追问」，右侧浮出一张小卡片专门回答这句话。
+            回答只留在卡片里——不新建会话、不写进日志、不把你的注意力从正文上拽走。
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="#install">安装到 DSH</a>
+            <a class="btn btn-ghost" href="#how">看看怎么用</a>
+          </div>
+          <div class="facts">
+            <span><b>0</b> 条会话记录被写入</span>
+            <span><b>3</b> 档上下文可选</span>
+            <span><b>1</b> 次右键起步</span>
+          </div>
+        </div>
+
+        <div class="hero-visual">
+          <div class="window">
+            <div class="window-bar"><i></i><i></i><i></i><span>主对话</span></div>
+            <div class="window-body">
+              <div class="line w80"></div>
+              <div class="line w60"></div>
+              <div class="line w70"></div>
+              <div class="msg-user">帮我梳理一下这份笔记。</div>
+              <div class="line w80"></div>
+              <div class="line w70"></div>
+              <div class="line w60"></div>
+              <p style="font-size:13.5px;color:#d5dae4;line-height:1.8;margin:0;">
+                …其中<span class="selection">深度思考会在推理之后再检索并标注来源</span>，这一点和普通搜索不同。
+              </p>
+
+              <div class="card">
+                <div class="card-head">
+                  <span class="card-title">追问 · 原文</span>
+                  <span class="card-close">×</span>
+                </div>
+                <div class="quote">
+                  <small>选中的内容</small>
+                  深度思考会在推理之后再检索并标注来源
+                </div>
+                <div class="answer">
+                  <b>深度思考</b>把「先想再查」的顺序做进了推理过程：模型先拆问题、判断要查什么，
+                  再检索并带着来源回答。和普通搜索的差别在于——
+                  <ul>
+                    <li>检索发生在推理中，不是问完一次再补</li>
+                    <li>答案末尾会带引用，方便回原文核对</li>
+                  </ul>
+                </div>
+                <div class="chips">
+                  <span class="chip">展开讲讲 <i>→</i></span>
+                  <span class="chip">举个例子 <i>→</i></span>
+                  <span class="chip">说简单点 <i>→</i></span>
+                </div>
+                <div class="modes">
+                  上下文
+                  <span class="mode">仅选中</span>
+                  <span class="mode on">近 5 轮</span>
+                  <span class="mode">全部</span>
+                </div>
+                <div class="composer">
+                  <div class="composer-placeholder">追问这段内容…</div>
+                  <span class="send">
+                    <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M8.3125 0.980206C8.66767 1.05312 8.97902 1.2042 9.2627 1.43235C9.48724 1.613 9.73029 1.85795 9.97949 2.10716L14.707 6.8347L13.293 8.24876L9 3.95579V15.0417H7V3.95579L2.70703 8.24876L1.29297 6.8347L6.02051 2.10716C6.26971 1.85795 6.51277 1.613 6.7373 1.43235C6.97662 1.23988 7.28445 1.04404 7.6875 0.980206C7.8973 0.947029 8.1031 0.955183 8.3125 0.980206Z" fill="#ffffff"/></svg>
+                  </span>
+                </div>
+                <div class="note">已带 Q8–Q10 · 6 条 · 只在这里显示</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="features">
+        <p class="eyebrow">为什么是「旁边」</p>
+        <h2>问归问，别把主线搅了</h2>
+        <p class="section-lede">
+          在主对话里追问会改掉后续对话的注意力，还会留下永远用不上的记录。这个插件把追问挪到旁边一张卡里，
+          而它读什么、带多少上下文，由你当场决定。
+        </p>
+        <div class="grid">
+          <div class="feature">
+            <div class="icon">🪟</div>
+            <h3>浮层卡片，不占版面</h3>
+            <p>贴着你选中的文字浮出，右侧优先、放不下自动翻到左侧；不挤压主界面，也不抢侧栏。</p>
+          </div>
+          <div class="feature">
+            <div class="icon">🎚️</div>
+            <h3>上下文你说了算</h3>
+            <p>默认只带选中的那一段；需要时才切「近 5 轮」或「全部」，按问题编号带上 Q1、Q2…</p>
+          </div>
+          <div class="feature">
+            <div class="icon">🧾</div>
+            <h3>零写入</h3>
+            <p>不新建会话、不写会话日志、不占侧栏列表。关闭卡片即清空，主对话完全不受影响。</p>
+          </div>
+          <div class="feature">
+            <div class="icon">📝</div>
+            <h3>回答按 Markdown 渲染</h3>
+            <p>粗体、列表、代码块、链接都正常显示；长回答在卡片内滚动，随时可以停止。</p>
+          </div>
+          <div class="feature">
+            <div class="icon">🎯</div>
+            <h3>问题会跟着内容变</h3>
+            <p>选代码给「解释 / 找问题 / 加注释」，选英文给「翻译 / 解释 / 说简单点」，选段落给「展开 / 举例」。</p>
+          </div>
+          <div class="feature">
+            <div class="icon">🪞</div>
+            <h3>和官方同一套视觉</h3>
+            <p>24px 圆角、34px 圆形蓝色发送键、18px 胶囊——几何和配色对齐 DeepSeek 官方聊天前端。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="how">
+        <p class="eyebrow">三步</p>
+        <h2>从读到问，两次操作</h2>
+        <p class="section-lede">不用离开阅读位置，不用碰剪贴板。</p>
+        <div class="steps">
+          <div class="step">
+            <div class="num">01</div>
+            <h3>划选一段</h3>
+            <p>在主对话里选中想深究的那句话、那段代码或那段英文。</p>
+          </div>
+          <div class="step">
+            <div class="num">02</div>
+            <h3>右键「追问」</h3>
+            <p>原生右键菜单不会弹出，卡片直接出现在选区右侧，顶部就是那段原文。</p>
+          </div>
+          <div class="step">
+            <div class="num">03</div>
+            <h3>问一句就好</h3>
+            <p>点一个建议问题，或自己敲一句回车；回答说卡在卡片里流式出现。</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="install">
+        <p class="eyebrow">安装</p>
+        <h2>两分钟装上</h2>
+        <p class="section-lede">插件是纯本地目录，没有任何构建步骤或第三方依赖。</p>
+        <div class="install-grid">
+          <div class="panel">
+            <h3>方式一 · 界面安装</h3>
+            <p>把 <code>selection-followup</code> 目录放到本机任意位置，然后在 DSH 里：</p>
+            <pre>设置 → 插件 → 添加本地插件
+选择 selection-followup 目录</pre>
+          </div>
+          <div class="panel">
+            <h3>方式二 · 让 Agent 装</h3>
+            <p>让 DSH 里的 Agent 执行安装动作，指向你克隆下来的目录：</p>
+            <pre>plugin_manager install_bundle
+  target: /path/to/selection-followup</pre>
+          </div>
+        </div>
+        <div class="limits">
+          <h3>它的边界（先说清楚）</h3>
+          <ul>
+            <li>纯问答：不能读文件、跑命令、调用工具；需要那些能力请回主对话。</li>
+            <li>选中文字和所选上下文会发给模型，走主对话同一条模型链路。</li>
+            <li>追问内容不落盘，关闭卡片或刷新即丢失。</li>
+            <li>卡片暂不支持拖动和缩放。</li>
+          </ul>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span>划词追问 · Selection follow-up · MIT</span>
+      <span>为 DeepSeek Harness 而写</span>
+    </footer>
+  </div>
+</body>
+</html>

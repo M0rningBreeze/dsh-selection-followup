@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Selection follow-up",
+    "description": "Select text in the main conversation, right-click, and choose Follow up: a small right-side panel answers without writing anything into the main conversation.",
+    "detail": "docs/DETAIL.md"
+  }
+}
