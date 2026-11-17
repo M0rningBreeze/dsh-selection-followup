@@ -29,6 +29,8 @@ ELECTRON_RUN_AS_NODE=1 node test-host.mjs
 ELECTRON_RUN_AS_NODE=1 node test-client.mjs
 ```
 
+在线展示：<https://m0rningbreeze.github.io/dsh-selection-followup/>
+
 ## License
 
 [MIT](LICENSE)
