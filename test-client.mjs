@@ -518,13 +518,47 @@ if (typeof glassStyle.backdropFilter !== 'string' || !glassStyle.backdropFilter.
 if (!String(glassStyle.backgroundColor).includes('color-mix')) {
   throw new Error(`wallpaper host did not get the glass mix: ${glassStyle.backgroundColor}`)
 }
-if (!String(glassStyle.backgroundColor).includes('--we-surface-tint-dark')) {
-  throw new Error('dark theme did not pick the dark tint')
+// The card must be built on the wallpaper plugin's panel colour, not on the
+// readability scrim: the scrim is much darker than the sidebar and reads as a
+// slab. This is the exact mismatch that made the card stand out.
+// The strength switch cycles panel -> glass -> clear and remembers the choice.
+const glassButton = (() => {
+  const found = []
+  const walkGlass = (node) => {
+    if (node === null || node === undefined || typeof node !== 'object') return
+    if (Array.isArray(node)) { node.forEach(walkGlass); return }
+    if (node.type === 'button' && /^glass\./.test(texts(node).join(''))) found.push(node)
+    walkGlass(node.props?.children)
+  }
+  walkGlass(renderTree())
+  return found[0]
+})()
+if (glassButton === undefined) throw new Error('glass strength switch missing on a wallpaper host')
+const glassBefore = String(renderTree().props.style.backgroundColor)
+glassButton.props.onClick()
+const afterClear = String(renderTree().props.style.backgroundColor)
+if (glassBefore === afterClear) throw new Error('glass switch did not change the surface')
+if (!afterClear.includes('* 3)')) throw new Error(`clear level lost its factor: ${afterClear}`)
+glassButton.props.onClick()
+const afterPanel = String(renderTree().props.style.backgroundColor)
+if (!afterPanel.includes('* 0)')) throw new Error(`panel level lost its factor: ${afterPanel}`)
+if (afterPanel === glassBefore || afterPanel === afterClear) {
+  throw new Error('the three glass levels must differ from each other')
 }
-darkOn = false
-const lightGlass = renderTree().props.style
-if (!String(lightGlass.backgroundColor).includes('--we-surface-tint-light')) {
-  throw new Error('light theme did not pick the light tint')
+glassButton.props.onClick()
+const glassStyle2 = renderTree().props.style
+if (glassStyle2 === undefined) throw new Error('card disappeared')
+if (!String(glassStyle.backgroundColor).includes('--we-panel-color')) {
+  throw new Error(`wallpaper host is not using the panel colour: ${glassStyle.backgroundColor}`)
+}
+if (String(glassStyle.backgroundColor).includes('--we-readability-base')) {
+  throw new Error(`wallpaper host is still built on the readability scrim: ${glassStyle.backgroundColor}`)
+}
+if (!String(glassStyle.backgroundColor).includes('--we-glass-alpha')) {
+  throw new Error('wallpaper host ignores the plugin glass alpha')
+}
+if (!String(glassStyle.backgroundImage ?? '').includes('linear-gradient')) {
+  throw new Error('wallpaper host lost the glass highlight')
 }
 // The plain background token must survive underneath, so a browser without
 // color-mix still paints something readable.

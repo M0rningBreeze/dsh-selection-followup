@@ -31,6 +31,46 @@ window.__ModuleLoader__.load({
 
     // --- panel state ------------------------------------------------------
 
+    /** Wallpaper glass strengths, from most solid to most see-through. */
+    const GLASS_LEVELS = ['panel', 'glass', 'clear']
+
+    /** Per-level opacity factor applied to the wallpaper's glass alpha. */
+    const GLASS_TUNING = {
+      // Wide gaps on purpose: over a dark, uniform wallpaper a few percent of
+      // transparency is invisible, so each step has to change the surface itself.
+      panel: {
+        alpha: 0, blur: 0.6,
+        border: 'var(--we-border, rgba(255, 255, 255, 0.10))',
+        shadow: '0 18px 48px rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.14)',
+      },
+      glass: {
+        alpha: 1.6, blur: 2,
+        border: 'var(--we-border, rgba(255, 255, 255, 0.16))',
+        shadow: '0 24px 64px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.20)',
+      },
+      clear: {
+        alpha: 3, blur: 3,
+        border: 'rgba(255, 255, 255, 0.22)',
+        shadow: '0 28px 72px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.26)',
+      },
+    }
+
+    /** Where the chosen glass strength is remembered between sessions. */
+    const GLASS_STORAGE_KEY = 'selection-followup:glass'
+
+    /**
+     * Read the remembered glass strength.
+     * @returns one of {@link GLASS_LEVELS}.
+     */
+    function storedGlassLevel() {
+      try {
+        const raw = globalThis.localStorage?.getItem(GLASS_STORAGE_KEY)
+        return GLASS_LEVELS.includes(raw) ? raw : 'glass'
+      } catch {
+        return 'glass'
+      }
+    }
+
     /** Card state: which Session it belongs to, the excerpt, where it was selected, and whether it shows. */
     const state = {
       sessionId: null,
@@ -40,6 +80,7 @@ window.__ModuleLoader__.load({
       quoteOpen: true,
       error: null,
       contextMode: 'selection',
+      glassLevel: storedGlassLevel(),
       contextCount: null,
       contextChars: 0,
       contextFrom: 0,
@@ -74,6 +115,13 @@ window.__ModuleLoader__.load({
       setContextMode(mode) {
         state.contextMode = mode
         state.contextCount = null
+        notify()
+      },
+      /** Cycle the wallpaper glass strength and remember the choice. */
+      cycleGlass() {
+        const index = GLASS_LEVELS.indexOf(state.glassLevel)
+        state.glassLevel = GLASS_LEVELS[(index + 1) % GLASS_LEVELS.length]
+        try { globalThis.localStorage?.setItem(GLASS_STORAGE_KEY, state.glassLevel) } catch { /* private mode */ }
         notify()
       },
       /** Replace the conversation turns; the excerpt folds away once an answer starts. */
@@ -191,6 +239,9 @@ window.__ModuleLoader__.load({
       'context.recent': '近 5 轮',
       'context.all': '全部',
       noteSelection: '仅引用这段 · 不写入主对话',
+      'glass.panel': '面板',
+      'glass.glass': '玻璃',
+      'glass.clear': '通透',
       contextNote: '已带 Q{from}–Q{to} · {n} 条',
       noContext: '这次没取到上下文，只带上了这段引用',
       error: '出错',
@@ -244,6 +295,9 @@ window.__ModuleLoader__.load({
       'context.recent': 'Last 5',
       'context.all': 'All',
       noteSelection: 'Excerpt only · not written to the main conversation',
+      'glass.panel': 'Panel',
+      'glass.glass': 'Glass',
+      'glass.clear': 'Clear',
       contextNote: 'Q{from}–Q{to} · {n} messages',
       noContext: 'No conversation context was available this time; the answer only sees this excerpt.',
       error: 'Error',
@@ -764,25 +818,31 @@ body[data-we-wallpaper] .sf-mode-on {
         // 96% opaque: over a flat host background this is the same colour to the
         // eye, over a wallpaper it lets the picture through like the host panels.
         backgroundColor: `color-mix(in srgb, ${base} 96%, transparent)`,
-        backdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
-        WebkitBackdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
+        backdropFilter: 'blur(calc(var(--we-floaters-blur, var(--we-blur, 18px)) * 1.4)) saturate(var(--we-saturate, 1.2))',
+        WebkitBackdropFilter: 'blur(calc(var(--we-floaters-blur, var(--we-blur, 18px)) * 1.4)) saturate(var(--we-saturate, 1.2))',
       }
       if (!wallpaper) return surface
-      const body = document.body
-      const dark = typeof body.hasAttribute === 'function' && body.hasAttribute('data-ds-dark-theme')
-      const tint = dark
-        ? 'var(--we-surface-tint-dark, #0d1524)'
-        : 'var(--we-surface-tint-light, #ffffff)'
-      const floor = 'max(var(--we-readability-floor, 0.82), 0.82)'
+      // Panel colour, not the readability scrim: `--we-readability-base` is the
+      // dark tint the plugin puts *behind* glass, and a card built on it reads as
+      // a darker, greener slab than the sidebar and settings cards, which use
+      // `--we-panel-color`. Matching that value is what makes the card look like
+      // one more panel instead of a patch.
+      const panel = 'var(--we-panel-color, var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay, #2c2c2e)))'
+      const alpha = 'var(--we-glass-alpha, 0.22)'
+      const tuning = GLASS_TUNING[state.glassLevel] ?? GLASS_TUNING.glass
       return {
         ...surface,
-        backgroundColor: `color-mix(in srgb, var(--we-readability-base, #14161b) calc(${floor} * 100%), `
-          + `color-mix(in srgb, ${tint} calc(var(--we-floaters-alpha, var(--we-glass-alpha, 0.22)) * 100%), transparent) `
-          + `calc((1 - ${floor}) * 100%))`,
+        // Panel colour at the chosen strength: `panel` sits close to the sidebar,
+        // `clear` is a thin sheet of frosted glass over the wallpaper.
+        backgroundColor: `color-mix(in srgb, ${panel} calc((1 - ${alpha} * ${tuning.alpha}) * 100%), transparent)`,
         backgroundImage: 'linear-gradient(180deg, var(--we-glass-highlight, rgba(255, 255, 255, 0.10)), '
           + 'rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0) 100%)',
-        borderColor: 'var(--we-border, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14)))',
-        boxShadow: '0 18px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18)',
+        backdropFilter: `blur(calc(var(--we-floaters-blur, var(--we-blur, 18px)) * ${tuning.blur})) `
+          + 'saturate(var(--we-saturate, 1.2))',
+        WebkitBackdropFilter: `blur(calc(var(--we-floaters-blur, var(--we-blur, 18px)) * ${tuning.blur})) `
+          + 'saturate(var(--we-saturate, 1.2))',
+        borderColor: tuning.border,
+        boxShadow: tuning.shadow,
       }
     }
 
@@ -955,6 +1015,14 @@ body[data-we-wallpaper] .sf-mode-on {
         h('div', { style: styles.head },
           h('span', { style: styles.headTitle }, t('title')),
           h('span', { style: { display: 'inline-flex', alignItems: 'center', gap: '4px' } },
+            wallpaper
+              ? h('button', {
+                type: 'button', className: 'sf-quote-toggle', style: styles.quoteToggle,
+                'aria-label': t(`glass.${current.glassLevel}`),
+                title: t(`glass.${current.glassLevel}`),
+                onClick: () => panelStore.cycleGlass(),
+              }, t(`glass.${current.glassLevel}`))
+              : null,
             selection !== null
               ? h('button', {
                 type: 'button', className: 'sf-quote-toggle', style: styles.quoteToggle,
