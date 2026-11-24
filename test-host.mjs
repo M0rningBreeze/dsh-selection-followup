@@ -52,6 +52,10 @@ const route = routes[0]
 if (route.path !== '/api/selection-followup/ask') throw new Error(`unexpected path ${route.path}`)
 if (route.requestBody !== 'buffered') throw new Error('expected buffered body')
 
+// A second activation must not register the route again (the slot is process-wide).
+apply(ctx)
+if (routes.length !== 1) throw new Error(`second activation registered the route again: ${routes.length}`)
+
 async function ask(body) {
   const response = await route.fetch(new Request('http://local/api/selection-followup/ask', {
     method: 'POST',
@@ -109,5 +113,17 @@ if (bad.status !== 400) throw new Error(`bad body status ${bad.status}`)
 
 const wrongMethod = await route.fetch(new Request('http://local/api/selection-followup/ask', { method: 'GET' }))
 if (wrongMethod.status !== 405) throw new Error(`wrong method status ${wrongMethod.status}`)
+
+// A host that already holds this path (left behind by an earlier activation)
+// must not turn into a failed activation.
+const orphan = {
+  ...ctx,
+  connection: {
+    fetch: {
+      register() { throw new Error('connection: exact Fetch route "/api/selection-followup/ask" is already registered') },
+    },
+  },
+}
+apply(orphan)
 
 console.log('host smoke test: ok')

@@ -13,6 +13,9 @@ export const inject = ['connection', 'llm', 'agentDefaultModel', 'sessions']
 /** Exact path below `/api`; the Client calls exactly this path. */
 const ASK_PATH = '/api/selection-followup/ask'
 
+/**Process-wide slot that lets a reloaded activation take over the one route. */
+const BRIDGE_KEY = Symbol.for('@local/selection-followup/route')
+
 /** Maximum characters kept from the selection. */
 const SELECTION_LIMIT = 4000
 
@@ -257,13 +260,41 @@ async function handleAsk(ctx, request) {
 
 /**
  * Register the exact ask route for the lifetime of this plugin.
+ *
+ * Reloading a plugin can leave a route behind: an activation that fails after
+ * registering it, or a disposal that races a re-enable, makes the next
+ * `register()` throw `already registered` and the whole entry fails to
+ * activate. The route is therefore registered once per process and delegates to
+ * whichever activation is live, so enable/disable cycles stay idempotent.
  * @param ctx - host plugin context.
  */
 export function apply(ctx) {
-  ctx.effect(() => ctx.connection.fetch.register({
-    path: ASK_PATH,
-    methods: ['POST'],
-    requestBody: 'buffered',
-    fetch: request => handleAsk(ctx, request),
-  }), 'selection-followup: ask route')
+  const host = globalThis
+  const bridge = host[BRIDGE_KEY] ?? (host[BRIDGE_KEY] = { handler: null, registered: false })
+  bridge.handler = request => handleAsk(ctx, request)
+  ctx.effect(() => {
+    if (!bridge.registered) {
+      const delegated = (request) => {
+        const handler = bridge.handler
+        if (handler === null) {
+          return Response.json({ error: 'selection follow-up is not active' }, { status: 503 })
+        }
+        return handler(request)
+      }
+      try {
+        ctx.connection.fetch.register({
+          path: ASK_PATH,
+          methods: ['POST'],
+          requestBody: 'buffered',
+          fetch: delegated,
+        })
+        bridge.registered = true
+      } catch (error) {
+        // A route left by an earlier activation already answers this path.
+        if (!/already registered/u.test(String(error?.message ?? error))) throw error
+        bridge.registered = true
+      }
+    }
+    return () => { bridge.handler = null }
+  }, 'selection-followup: ask route')
 }

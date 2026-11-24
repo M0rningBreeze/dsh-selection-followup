@@ -383,6 +383,38 @@ window.__ModuleLoader__.load({
   outline: none; box-shadow: 0 0 0 2px ${COLORS.blue};
 }
 .sf-card textarea::placeholder { color: ${COLORS.caption}; }
+
+/* Liquid glass while dsh-plugin-wallpaper-engine is active.
+   That plugin rewrites the host's surfaces into translucent glass, but it only
+   retargets surfaces it knows; this card is not one of them, so it would stay an
+   opaque slab floating over the wallpaper — the reported colour block. These
+   rules are scoped to that plugin's own body attributes and variables, so a host
+   without it never matches the selector and renders exactly as before. */
+body[data-we-wallpaper]:not([data-ds-dark-theme]) .sf-card { --sf-we-tint: var(--we-surface-tint-light, #ffffff); }
+body[data-we-wallpaper][data-ds-dark-theme] .sf-card { --sf-we-tint: var(--we-surface-tint-dark, #0d1524); }
+body[data-we-wallpaper] .sf-card {
+  background-color: color-mix(in srgb,
+    var(--we-readability-base, #14161b) calc(max(var(--we-readability-floor, 0.82), 0.82) * 100%),
+    color-mix(in srgb, var(--sf-we-tint, #ffffff) calc(var(--we-floaters-alpha, var(--we-glass-alpha, 0.22)) * 100%), transparent) calc((1 - max(var(--we-readability-floor, 0.82), 0.82)) * 100%)) !important;
+  background-image: linear-gradient(180deg, var(--we-glass-highlight, rgba(255, 255, 255, 0.10)), rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0) 100%) !important;
+  -webkit-backdrop-filter: blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2));
+  backdrop-filter: blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2));
+  border-color: var(--we-border, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14))) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+body[data-we-wallpaper] .sf-card .sf-quote { background: rgba(255, 255, 255, 0.06) !important; }
+/* Follow the wallpaper's own accent for the two round buttons and the active
+   context chip; without the plugin these rules never match. */
+body[data-we-wallpaper] .sf-send,
+body[data-we-wallpaper] .sf-stop { background: var(--we-ui-send, var(--we-accent, ${COLORS.blue})); }
+body[data-we-wallpaper] .sf-send:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--we-ui-send, var(--we-accent, ${COLORS.blue})) 82%, #000000);
+}
+body[data-we-wallpaper] .sf-mode-on {
+  border-color: var(--we-accent, ${COLORS.blue}) !important;
+  color: var(--we-accent, ${COLORS.blue}) !important;
+  background: color-mix(in srgb, var(--we-accent, ${COLORS.blue}) 16%, transparent) !important;
+}
 `
 
     const styles = {
@@ -863,7 +895,7 @@ window.__ModuleLoader__.load({
               'aria-label': t('close'), title: t('close'),
               onClick: () => panelStore.close(),
             }, '×'))),
-        selection !== null && current.quoteOpen ? h('div', { style: styles.quote },
+        selection !== null && current.quoteOpen ? h('div', { className: 'sf-quote', style: styles.quote },
           h('div', { style: styles.quoteHead },
             h('span', null, t('quoteLabel')),
             quoteLines.length > 4
@@ -905,6 +937,7 @@ window.__ModuleLoader__.load({
             h('span', { style: styles.modeLabel }, t('contextLabel')),
             CONTEXT_MODES.map(mode => h('button', {
               key: mode, type: 'button',
+              className: current.contextMode === mode ? 'sf-mode sf-mode-on' : 'sf-mode',
               style: current.contextMode === mode ? styles.modeChipActive : styles.modeChip,
               'aria-pressed': current.contextMode === mode,
               onClick: () => panelStore.setContextMode(mode),

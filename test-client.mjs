@@ -450,6 +450,36 @@ headerCopy.props.onClick()
 await new Promise(resolve => setTimeout(resolve, 10))
 if (copiedText !== 'copy me please') throw new Error(`header copy wrote wrong text: ${copiedText}`)
 
+// Wallpaper-engine compatibility: the glass override must be fully scoped to that
+// plugin's own body attributes, and the default surface must stay the design token.
+const styleNodes = []
+const walkStyle = (node) => {
+  if (node === null || node === undefined || typeof node !== 'object') return
+  if (Array.isArray(node)) { node.forEach(walkStyle); return }
+  if (node.type === 'style') styleNodes.push(String(node.props.children ?? ''))
+  walkStyle(node.props?.children)
+}
+walkStyle(copyTree)
+if (styleNodes.length !== 1) throw new Error(`expected one style block, got ${styleNodes.length}`)
+const css = styleNodes[0]
+if (!css.includes('body[data-we-wallpaper] .sf-card')) throw new Error('wallpaper glass override missing')
+if (!css.includes('--we-readability-base')) throw new Error('glass override does not follow the host variables')
+if (!/backdrop-filter: blur\(var\(--we-floaters-blur/.test(css)) throw new Error('glass blur missing')
+// Every `.sf-card` rule that sets a surface must sit behind the wallpaper scope.
+for (const rule of css.split('}')) {
+  if (!/\.sf-card\s*(\{|$)/.test(rule)) continue
+  const selector = rule.split('{')[0]
+  if (selector.includes('placeholder') || selector.includes(':hover') || selector.includes(':focus')) continue
+  if (!selector.includes('[data-we-wallpaper]')) {
+    throw new Error(`unscoped card surface rule: ${selector.trim()}`)
+  }
+}
+// Without the plugin the card keeps the plain token background.
+const cardNode = copyTree
+if (cardNode.props.style.background !== 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay))') {
+  throw new Error(`card background changed for non-wallpaper hosts: ${cardNode.props.style.background}`)
+}
+
 console.log('client test: ok', { effects: effects.length })
 
 
