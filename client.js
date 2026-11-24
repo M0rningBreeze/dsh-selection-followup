@@ -717,6 +717,59 @@ body[data-we-wallpaper] .sf-mode-on {
       return blocks
     }
 
+    // --- wallpaper coexistence --------------------------------------------
+    //
+    // `dsh-plugin-wallpaper-engine` turns the host surfaces into liquid glass and
+    // marks the document with `data-we-wallpaper`. Surfaces it does not know keep
+    // their own opaque background, which reads as a solid slab over the wallpaper.
+    //
+    // The surface is decided in JavaScript rather than with an ancestor selector:
+    // a `body[...] .sf-card` rule cannot match if this slot renders inside a shadow
+    // root, and that failure is silent. The values are still the plugin's own
+    // variables, so its sliders keep retinting the card.
+
+    /** Marker the wallpaper plugin writes on <body> while it is active. */
+    const WALLPAPER_ATTR = 'data-we-wallpaper'
+
+    /** Accent used for the round actions while a wallpaper is active. */
+    const ACCENT = 'var(--we-ui-send, var(--we-accent, #5686fe))'
+
+    /**
+     * Whether the wallpaper plugin currently owns the page background.
+     * @returns true while a wallpaper is active.
+     */
+    function wallpaperActive() {
+      if (typeof document === 'undefined') return false
+      const body = document.body
+      if (body === null || body === undefined) return false
+      return typeof body.hasAttribute === 'function' && body.hasAttribute(WALLPAPER_ATTR)
+    }
+
+    /**
+     * Glass surface matching the wallpaper plugin, or null on a plain host.
+     * @returns the style fragment merged into the card, or null.
+     */
+    function wallpaperSurface() {
+      if (!wallpaperActive()) return null
+      const body = document.body
+      const dark = typeof body.hasAttribute === 'function' && body.hasAttribute('data-ds-dark-theme')
+      const tint = dark
+        ? 'var(--we-surface-tint-dark, #0d1524)'
+        : 'var(--we-surface-tint-light, #ffffff)'
+      const floor = 'max(var(--we-readability-floor, 0.82), 0.82)'
+      return {
+        backgroundColor: `color-mix(in srgb, var(--we-readability-base, #14161b) calc(${floor} * 100%), `
+          + `color-mix(in srgb, ${tint} calc(var(--we-floaters-alpha, var(--we-glass-alpha, 0.22)) * 100%), transparent) `
+          + `calc((1 - ${floor}) * 100%))`,
+        backgroundImage: 'linear-gradient(180deg, var(--we-glass-highlight, rgba(255, 255, 255, 0.10)), '
+          + 'rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0) 100%)',
+        backdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
+        WebkitBackdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
+        borderColor: 'var(--we-border, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14)))',
+        boxShadow: '0 18px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18)',
+      }
+    }
+
     // --- component --------------------------------------------------------
 
     /**
@@ -741,6 +794,18 @@ body[data-we-wallpaper] .sf-mode-on {
       const selection = current.selection
       const turns = current.turns
       const placement = useMemo(() => placementOf(current.anchor), [current.anchor, visible])
+      // Re-read the wallpaper marker when the plugin activates or leaves; the
+      // observer also covers the case where the page loads with it already on.
+      const [, bumpWallpaper] = React.useReducer(value => value + 1, 0)
+      useEffect(() => {
+        if (!visible || typeof document === 'undefined' || typeof MutationObserver !== 'function') return
+        const body = document.body
+        if (body === null || body === undefined) return
+        const observer = new MutationObserver(() => { bumpWallpaper() })
+        observer.observe(body, { attributes: true, attributeFilter: [WALLPAPER_ATTR, 'data-ds-dark-theme'] })
+        return () => { observer.disconnect() }
+      }, [visible])
+      const surface = wallpaperSurface()
 
       useEffect(() => {
         if (!visible) return
@@ -865,7 +930,8 @@ body[data-we-wallpaper] .sf-mode-on {
       }
 
       return h('div', {
-        ref: cardRef, className: 'sf-card', style: { ...styles.card, ...placement },
+        ref: cardRef, className: 'sf-card',
+        style: { ...styles.card, ...surface, ...placement },
         role: 'dialog', 'aria-label': t('title'),
       },
         h('style', { key: 'css' }, CARD_CSS),
@@ -895,7 +961,10 @@ body[data-we-wallpaper] .sf-mode-on {
               'aria-label': t('close'), title: t('close'),
               onClick: () => panelStore.close(),
             }, '×'))),
-        selection !== null && current.quoteOpen ? h('div', { className: 'sf-quote', style: styles.quote },
+        selection !== null && current.quoteOpen ? h('div', {
+          className: 'sf-quote',
+          style: surface === null ? styles.quote : { ...styles.quote, background: 'rgba(255, 255, 255, 0.06)' },
+        },
           h('div', { style: styles.quoteHead },
             h('span', null, t('quoteLabel')),
             quoteLines.length > 4
@@ -938,7 +1007,16 @@ body[data-we-wallpaper] .sf-mode-on {
             CONTEXT_MODES.map(mode => h('button', {
               key: mode, type: 'button',
               className: current.contextMode === mode ? 'sf-mode sf-mode-on' : 'sf-mode',
-              style: current.contextMode === mode ? styles.modeChipActive : styles.modeChip,
+              style: current.contextMode !== mode
+                ? styles.modeChip
+                : surface === null
+                  ? styles.modeChipActive
+                  : {
+                    ...styles.modeChipActive,
+                    borderColor: ACCENT,
+                    color: ACCENT,
+                    background: `color-mix(in srgb, ${ACCENT} 16%, transparent)`,
+                  },
               'aria-pressed': current.contextMode === mode,
               onClick: () => panelStore.setContextMode(mode),
             }, t(`context.${mode}`)))),
@@ -963,7 +1041,8 @@ body[data-we-wallpaper] .sf-mode-on {
                 : t('privateNote')),
             busy
               ? h('button', {
-                type: 'button', className: 'sf-stop', style: styles.actionStop,
+                type: 'button', className: 'sf-stop',
+                style: surface === null ? styles.actionStop : { ...styles.actionStop, background: ACCENT },
                 'aria-label': t('stop'), title: t('stop'),
                 onClick: () => abortRef.current?.abort(),
               }, h('svg', {
@@ -973,7 +1052,8 @@ body[data-we-wallpaper] .sf-mode-on {
                 x: 3.5, y: 3.5, width: 9, height: 9, rx: 2, fill: 'currentColor',
               })))
               : h('button', {
-                type: 'button', className: 'sf-send', style: styles.action,
+                type: 'button', className: 'sf-send',
+                style: surface === null ? styles.action : { ...styles.action, background: ACCENT },
                 'aria-label': t('send'), title: t('send'),
                 disabled: draft.trim() === '',
                 onClick: () => { void ask(draft) },

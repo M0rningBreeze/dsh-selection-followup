@@ -479,6 +479,46 @@ const cardNode = copyTree
 if (cardNode.props.style.background !== 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay))') {
   throw new Error(`card background changed for non-wallpaper hosts: ${cardNode.props.style.background}`)
 }
+if (cardNode.props.style.backdropFilter !== undefined) {
+  throw new Error('a host without the wallpaper plugin got a glass surface')
+}
+
+// With the wallpaper plugin active the surface is decided in JavaScript, so it
+// works even where an ancestor selector could not reach the card.
+let wallpaperOn = false
+let darkOn = true
+globalThis.document.body = {
+  hasAttribute: name => (name === 'data-we-wallpaper'
+    ? wallpaperOn
+    : name === 'data-ds-dark-theme' ? darkOn : false),
+}
+select('const glass = 1')
+if (renderTree().props.style.backdropFilter !== undefined) {
+  throw new Error('glass applied while the wallpaper marker is absent')
+}
+wallpaperOn = true
+select('const glass = 2')
+const glassTree = renderTree()
+const glassStyle = glassTree.props.style
+if (typeof glassStyle.backdropFilter !== 'string' || !glassStyle.backdropFilter.includes('blur(')) {
+  throw new Error(`wallpaper host did not get a blur surface: ${glassStyle.backdropFilter}`)
+}
+if (!String(glassStyle.backgroundColor).includes('color-mix')) {
+  throw new Error(`wallpaper host did not get the glass mix: ${glassStyle.backgroundColor}`)
+}
+if (!String(glassStyle.backgroundColor).includes('--we-surface-tint-dark')) {
+  throw new Error('dark theme did not pick the dark tint')
+}
+darkOn = false
+const lightGlass = renderTree().props.style
+if (!String(lightGlass.backgroundColor).includes('--we-surface-tint-light')) {
+  throw new Error('light theme did not pick the light tint')
+}
+// The plain background token must survive underneath, so a browser without
+// color-mix still paints something readable.
+if (glassStyle.background !== 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay))') {
+  throw new Error('glass surface replaced the fallback token')
+}
 
 console.log('client test: ok', { effects: effects.length })
 
