@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Client half of the selection follow-up plugin.
  *
  * Registers one frame-wide overlay card. Selecting text in the main
@@ -750,7 +750,20 @@ body[data-we-wallpaper] .sf-mode-on {
      * @returns the style fragment merged into the card, or null.
      */
     function wallpaperSurface() {
-      if (!wallpaperActive()) return null
+      const wallpaper = wallpaperActive()
+      // Base colour: the wallpaper plugin's readability base when it is present,
+      // otherwise the host's own layer token. The second half of the fallback
+      // chain is what a plain host keeps using, so the card never depends on
+      // detection succeeding — a missed marker costs tint, not the surface.
+      const base = 'var(--we-readability-base, var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay, #2c2c2e)))'
+      const surface = {
+        // 94% opaque: over a flat host background this is the same colour to the
+        // eye, over a wallpaper it lets the picture through like the host panels.
+        backgroundColor: `color-mix(in srgb, ${base} 94%, transparent)`,
+        backdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
+        WebkitBackdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
+      }
+      if (!wallpaper) return surface
       const body = document.body
       const dark = typeof body.hasAttribute === 'function' && body.hasAttribute('data-ds-dark-theme')
       const tint = dark
@@ -758,13 +771,12 @@ body[data-we-wallpaper] .sf-mode-on {
         : 'var(--we-surface-tint-light, #ffffff)'
       const floor = 'max(var(--we-readability-floor, 0.82), 0.82)'
       return {
+        ...surface,
         backgroundColor: `color-mix(in srgb, var(--we-readability-base, #14161b) calc(${floor} * 100%), `
           + `color-mix(in srgb, ${tint} calc(var(--we-floaters-alpha, var(--we-glass-alpha, 0.22)) * 100%), transparent) `
           + `calc((1 - ${floor}) * 100%))`,
         backgroundImage: 'linear-gradient(180deg, var(--we-glass-highlight, rgba(255, 255, 255, 0.10)), '
           + 'rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0) 100%)',
-        backdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
-        WebkitBackdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
         borderColor: 'var(--we-border, var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.14)))',
         boxShadow: '0 18px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18)',
       }
@@ -805,6 +817,7 @@ body[data-we-wallpaper] .sf-mode-on {
         observer.observe(body, { attributes: true, attributeFilter: [WALLPAPER_ATTR, 'data-ds-dark-theme'] })
         return () => { observer.disconnect() }
       }, [visible])
+      const wallpaper = wallpaperActive()
       const surface = wallpaperSurface()
 
       useEffect(() => {
@@ -963,7 +976,7 @@ body[data-we-wallpaper] .sf-mode-on {
             }, '×'))),
         selection !== null && current.quoteOpen ? h('div', {
           className: 'sf-quote',
-          style: surface === null ? styles.quote : { ...styles.quote, background: 'rgba(255, 255, 255, 0.06)' },
+          style: wallpaper ? { ...styles.quote, background: 'rgba(255, 255, 255, 0.06)' } : styles.quote,
         },
           h('div', { style: styles.quoteHead },
             h('span', null, t('quoteLabel')),
@@ -1009,7 +1022,7 @@ body[data-we-wallpaper] .sf-mode-on {
               className: current.contextMode === mode ? 'sf-mode sf-mode-on' : 'sf-mode',
               style: current.contextMode !== mode
                 ? styles.modeChip
-                : surface === null
+                : !wallpaper
                   ? styles.modeChipActive
                   : {
                     ...styles.modeChipActive,
@@ -1042,7 +1055,7 @@ body[data-we-wallpaper] .sf-mode-on {
             busy
               ? h('button', {
                 type: 'button', className: 'sf-stop',
-                style: surface === null ? styles.actionStop : { ...styles.actionStop, background: ACCENT },
+                style: wallpaper ? { ...styles.actionStop, background: ACCENT } : styles.actionStop,
                 'aria-label': t('stop'), title: t('stop'),
                 onClick: () => abortRef.current?.abort(),
               }, h('svg', {
@@ -1053,7 +1066,7 @@ body[data-we-wallpaper] .sf-mode-on {
               })))
               : h('button', {
                 type: 'button', className: 'sf-send',
-                style: surface === null ? styles.action : { ...styles.action, background: ACCENT },
+                style: wallpaper ? { ...styles.action, background: ACCENT } : styles.action,
                 'aria-label': t('send'), title: t('send'),
                 disabled: draft.trim() === '',
                 onClick: () => { void ask(draft) },
@@ -1091,4 +1104,6 @@ body[data-we-wallpaper] .sf-mode-on {
     }
   },
 })
+
+
 

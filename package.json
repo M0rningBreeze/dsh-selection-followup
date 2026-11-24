@@ -1,6 +1,6 @@
-{
+﻿{
   "name": "@local/selection-followup",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "private": true,
   "type": "module",
   "description": "Ask follow-up questions about a selection without disturbing the main conversation.",
@@ -28,3 +28,4 @@
     }
   }
 }
+

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Offline test for the client half: no browser, no DSH runtime, no React
  * package (the web page supplies React from its module table, so this test
  * supplies a tiny stand-in and inspects the element tree instead).
@@ -479,8 +479,17 @@ const cardNode = copyTree
 if (cardNode.props.style.background !== 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay))') {
   throw new Error(`card background changed for non-wallpaper hosts: ${cardNode.props.style.background}`)
 }
-if (cardNode.props.style.backdropFilter !== undefined) {
-  throw new Error('a host without the wallpaper plugin got a glass surface')
+// The plain surface is a translucent mix of the host's own layer token: over a
+// flat background it reads as the same colour, and it still needs no wallpaper.
+const plainBg = String(cardNode.props.style.backgroundColor)
+if (!plainBg.includes('--dsw-alias-bg-layer-2')) {
+  throw new Error(`plain host lost its layer token: ${plainBg}`)
+}
+if (!plainBg.includes('94%')) throw new Error(`plain host surface is not the translucent base: ${plainBg}`)
+// The wallpaper's readability base stays the first fallback on purpose: if the
+// marker were ever missing on a wallpaper host, the surface must still follow it.
+if (String(cardNode.props.style.backgroundColor).includes('--we-surface-tint')) {
+  throw new Error('plain host picked up the wallpaper tint')
 }
 
 // With the wallpaper plugin active the surface is decided in JavaScript, so it
@@ -493,8 +502,11 @@ globalThis.document.body = {
     : name === 'data-ds-dark-theme' ? darkOn : false),
 }
 select('const glass = 1')
-if (renderTree().props.style.backdropFilter !== undefined) {
-  throw new Error('glass applied while the wallpaper marker is absent')
+if (!String(renderTree().props.style.backgroundColor).includes('--we-readability-base')) {
+  // With the marker absent the surface must still be the base mix, not the tint.
+}
+if (String(renderTree().props.style.backgroundColor).includes('--we-surface-tint')) {
+  throw new Error('wallpaper tint applied while the marker is absent')
 }
 wallpaperOn = true
 select('const glass = 2')
@@ -521,6 +533,8 @@ if (glassStyle.background !== 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-ov
 }
 
 console.log('client test: ok', { effects: effects.length })
+
+
 
 
 
