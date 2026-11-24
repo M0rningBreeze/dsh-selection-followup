@@ -751,15 +751,19 @@ body[data-we-wallpaper] .sf-mode-on {
      */
     function wallpaperSurface() {
       const wallpaper = wallpaperActive()
-      // Base colour: the wallpaper plugin's readability base when it is present,
-      // otherwise the host's own layer token. The second half of the fallback
-      // chain is what a plain host keeps using, so the card never depends on
-      // detection succeeding — a missed marker costs tint, not the surface.
-      const base = 'var(--we-readability-base, var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay, #2c2c2e)))'
+      // Base colour, most specific first:
+      //   1. the wallpaper plugin's own panel colour — the value its layer-1
+      //      mapping paints on the sidebar and settings cards, so the card matches
+      //      those panels instead of inventing a tone of its own;
+      //   2. the readability base it uses behind glass;
+      //   3. the host's own layer token, which is what a plain host keeps using.
+      // The chain means a missed marker costs tint, not the surface.
+      const base = 'var(--we-panel-color, var(--we-readability-base, '
+        + 'var(--dsw-alias-bg-layer-2, var(--dsw-alias-bg-overlay, #2c2c2e))))'
       const surface = {
-        // 94% opaque: over a flat host background this is the same colour to the
+        // 96% opaque: over a flat host background this is the same colour to the
         // eye, over a wallpaper it lets the picture through like the host panels.
-        backgroundColor: `color-mix(in srgb, ${base} 94%, transparent)`,
+        backgroundColor: `color-mix(in srgb, ${base} 96%, transparent)`,
         backdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
         WebkitBackdropFilter: 'blur(var(--we-floaters-blur, var(--we-blur, 18px))) saturate(var(--we-saturate, 1.2))',
       }

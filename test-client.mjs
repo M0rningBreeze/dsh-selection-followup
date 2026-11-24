@@ -485,7 +485,7 @@ const plainBg = String(cardNode.props.style.backgroundColor)
 if (!plainBg.includes('--dsw-alias-bg-layer-2')) {
   throw new Error(`plain host lost its layer token: ${plainBg}`)
 }
-if (!plainBg.includes('94%')) throw new Error(`plain host surface is not the translucent base: ${plainBg}`)
+if (!plainBg.includes('96%')) throw new Error(`plain host surface is not the translucent base: ${plainBg}`)
 // The wallpaper's readability base stays the first fallback on purpose: if the
 // marker were ever missing on a wallpaper host, the surface must still follow it.
 if (String(cardNode.props.style.backgroundColor).includes('--we-surface-tint')) {
