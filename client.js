@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Client half of the selection follow-up plugin.
  *
  * Registers one frame-wide overlay card. Selecting text in the main

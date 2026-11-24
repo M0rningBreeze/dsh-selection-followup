@@ -2,7 +2,18 @@
  * Offline smoke test for the host half: no DSH runtime, no network.
  * Run with the bundled Node: `ELECTRON_RUN_AS_NODE=1 node test-host.mjs`
  */
+import fs from 'node:fs'
 import { apply } from './index.js'
+
+// A UTF-8 BOM makes the manifest unparseable to the loader, which then reports
+// the bundle as missing and the plugin never starts. Guard the files the host
+// reads directly.
+for (const name of ['package.json', 'cordis.patch.yml', 'index.js', 'client.js']) {
+  const bytes = fs.readFileSync(new URL(name, import.meta.url))
+  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
+    throw new Error(`${name} starts with a UTF-8 BOM; the loader will refuse it`)
+  }
+}
 
 const routes = []
 const requests = []

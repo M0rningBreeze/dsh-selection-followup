@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Offline test for the client half: no browser, no DSH runtime, no React
  * package (the web page supplies React from its module table, so this test
  * supplies a tiny stand-in and inspects the element tree instead).
